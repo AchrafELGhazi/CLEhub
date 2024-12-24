@@ -1,0 +1,192 @@
+-- Drop child tables first
+DROP TABLE IF EXISTS Date_of_event CASCADE;
+DROP TABLE IF EXISTS DateOfSession CASCADE;
+DROP TABLE IF EXISTS Event CASCADE;
+DROP TABLE IF EXISTS MentoringSession CASCADE;
+DROP TABLE IF EXISTS FYE_Coordinators CASCADE;
+DROP TABLE IF EXISTS Mentors CASCADE;
+DROP TABLE IF EXISTS Mentees CASCADE;
+
+-- Drop Admin and Users tables (parent tables)
+DROP TABLE IF EXISTS Admin CASCADE;
+DROP TABLE IF EXISTS Users CASCADE;
+
+CREATE TABLE Users (
+    UsersID INT PRIMARY KEY NOT NULL, 
+    Users_fname VARCHAR(50) NOT NULL,
+    Users_lname VARCHAR(50) NOT NULL,
+    School VARCHAR(100),
+    Major VARCHAR(50),
+    Classification VARCHAR(50),
+    user_type VARCHAR(50), 
+    email_address VARCHAR(100) UNIQUE NOT NULL, 
+    password VARCHAR(255) NOT NULL             
+);
+
+CREATE TABLE Mentees (
+    UsersID INT PRIMARY KEY NOT NULL, 
+    Mentor_ID INT NOT NULL, 
+    FOREIGN KEY (UsersID) REFERENCES Users(UsersID) ON DELETE CASCADE,
+    FOREIGN KEY (Mentor_ID) REFERENCES Users(UsersID)
+);
+
+CREATE TABLE Mentors (
+    UsersID INT PRIMARY KEY NOT NULL, 
+    Admin_ID INT NOT NULL, 
+    FOREIGN KEY (UsersID) REFERENCES Users(UsersID) ON DELETE CASCADE,
+    FOREIGN KEY (Admin_ID) REFERENCES Users(UsersID)
+);
+
+CREATE TABLE Admin (
+    UsersID INT PRIMARY KEY NOT NULL, 
+    AdminType VARCHAR(50) NOT NULL, 
+    FOREIGN KEY (UsersID) REFERENCES Users(UsersID) ON DELETE CASCADE
+);
+
+CREATE TABLE FYE_Coordinators (
+    UsersID INT PRIMARY KEY NOT NULL,
+    Admin_ID INT NOT NULL, 
+    FOREIGN KEY (UsersID) REFERENCES Users(UsersID) ON DELETE CASCADE,
+    FOREIGN KEY (Admin_ID) REFERENCES Admin(UsersID)
+);
+
+CREATE OR REPLACE FUNCTION validate_mentor_admin()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM Admin
+        WHERE UsersID = NEW.Admin_ID AND AdminType = 'Mentor Admin'
+    ) THEN
+        RAISE EXCEPTION 'Admin_ID must reference an Admin with AdminType = "Mentor Admin"';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER validate_mentor_admin_trigger
+BEFORE INSERT OR UPDATE ON Mentors
+FOR EACH ROW
+EXECUTE FUNCTION validate_mentor_admin();
+
+CREATE OR REPLACE FUNCTION validate_event_admin()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM Admin
+        WHERE UsersID = NEW.Admin_ID AND AdminType = 'Event Organizer Admin'
+    ) THEN
+        RAISE EXCEPTION 'Admin_ID must reference an Admin with AdminType = "Event Organizer Admin"';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER validate_event_admin_trigger
+BEFORE INSERT OR UPDATE ON FYE_Coordinators
+FOR EACH ROW
+EXECUTE FUNCTION validate_event_admin();
+
+CREATE TABLE MentoringSession (
+    SessionID INT PRIMARY KEY NOT NULL, 
+    SessionTitle VARCHAR(100) NOT NULL,
+    Deadline DATE NOT NULL,
+    Duration INT NOT NULL, 
+    MandatoryOptional VARCHAR(10) NOT NULL
+);
+
+CREATE TABLE DateOfSession (
+    UsersID INT NOT NULL,
+    SessionID INT NOT NULL,
+    DateOfSession DATE NOT NULL,
+    PRIMARY KEY (UsersID, SessionID), 
+    FOREIGN KEY (UsersID) REFERENCES Users(UsersID) ON DELETE CASCADE,
+    FOREIGN KEY (SessionID) REFERENCES MentoringSession(SessionID) ON DELETE CASCADE
+);
+
+CREATE TABLE Event (
+    EventID INT PRIMARY KEY NOT NULL, 
+    EventTitle VARCHAR(100) NOT NULL,
+    EventBudget DECIMAL(10, 2) NOT NULL
+);
+
+CREATE TABLE Date_of_event (
+    UsersID INT NOT NULL,
+    EventID INT NOT NULL,
+    DateOfEvent DATE NOT NULL,
+    TimeOfEvent TIME NOT NULL,
+    PRIMARY KEY (UsersID, EventID), 
+    FOREIGN KEY (UsersID) REFERENCES Users(UsersID) ON DELETE CASCADE,
+    FOREIGN KEY (EventID) REFERENCES Event(EventID) ON DELETE CASCADE
+);
+
+
+
+INSERT INTO Users (UsersID, Users_fname, Users_lname, School, Major, Classification, user_type, email_address, password)
+VALUES 
+(144428, 'Tiphany', 'Wairimu Muchemi', 'SSE', 'Computer Science', 'Junior', 'Mentor', 'T.wairimumuchemi@aui.ma', 'default_password'),
+(101773, 'Hiba', 'Bouyahyaoui', 'SBA', 'Business Administration', 'Junior', 'Mentor', 'H.bouyahyaoui@aui.ma', 'default_password'),
+(101228, 'Abir', 'Bendidi', 'SSE', 'Computer Science', 'Junior', 'Admin', 'A.bendidi@aui.ma', 'default_password'),
+(142404, 'Adnane', 'Bakkou', 'SBA', 'Business Administration', 'Freshman', 'Mentee', 'A.bakkou@aui.ma', 'default_password'),
+(119039, 'Aya', 'Dafir', 'SSE', 'Engineering Management Science', 'Freshman', 'Mentee', 'A.dafir@aui.ma', 'default_password'),
+(123367, 'Boutayna', 'El Ghoumari', 'SSE', 'General Engineering', 'Sophomore', 'FYE_Coordinator', 'B.elghoumari@aui.ma', 'default_password'),
+(142652, 'Chahd', 'Nezhari', 'SSH', 'International Studies', 'Senior', 'Mentor', 'C.nezhari@aui.ma', 'default_password'),
+(137472, 'Fahd', 'Ezzaki', 'SSE', 'Computer Science', 'Senior', 'Admin', 'F.ezzaki@aui.ma', 'default_password'),
+(160300, 'Hanna', 'Abrahem', 'SBA', 'Business Administration', 'Freshman', 'Mentee', 'H.abrahem@aui.ma', 'default_password'),
+(108349, 'Hiba', 'Sabri', 'SSE', 'Engineering Management Science', 'Freshman', 'FYE_Coordinator', 'H.sabri@aui.ma', 'default_password'),
+(145517, 'Kenza', 'Benjelloun', 'SSH', 'Human Resources', 'Freshman', 'Mentee', 'K.benjelloun@aui.ma', 'default_password');
+
+
+INSERT INTO Mentees (UsersID, Mentor_ID)
+VALUES 
+(142404, 101773), 
+(119039, 144428),
+(160300, 101773),
+(145517, 142652); 
+
+INSERT INTO Admin (UsersID, AdminType)
+VALUES 
+(101228, 'Mentor Admin'),
+(137472, 'Event Organizer Admin'); 
+
+INSERT INTO FYE_Coordinators (UsersID, Admin_ID)
+VALUES 
+(123367, 137472),
+(108349, 137472); 
+
+INSERT INTO MentoringSession (SessionID, SessionTitle, Deadline, Duration, MandatoryOptional)
+VALUES 
+(1, 'Introductory session', '2024-09-10', 30, 'Mandatory'),
+(2, 'AUI Policies and Other Information ', '2024-09-20', 30, 'Mandatory'),
+(3, 'ADAPTING TO THE NEW LIFESTYLE ', '2024-09-26', 30, 'Mandatory'),
+(4, 'ACADEMIC SYSTEM & SCHOOL GUIDES', '2024-10-02', 60, 'Mandatory'),
+(5, 'MIDTERM PREPARATION & STUDY TECHNIQUES', '2024-10-08', 30, 'Optional'),
+(6, 'INFORMATION SESSION: ACADEMIC DEGREE PLAN', '2024-10-20', 60, 'Mandatory');
+
+INSERT INTO DateOfSession (UsersID, SessionID, DateOfSession)
+VALUES 
+(142652, 1, '2024-09-07'),
+(101773, 1, '2024-09-07'),
+(144428, 1, '2024-09-06'),
+(142652, 2, '2024-09-11'),
+(101773, 2, '2024-09-12'),
+(144428, 3, '2024-09-17'),
+(142652, 3, '2024-09-13'),
+(101773, 3, '2024-09-13'),
+(144428, 4, '2024-09-20')
+; 
+
+INSERT INTO Event (EventID, EventTitle, EventBudget)
+VALUES 
+(1, 'Tech Career Fair', 3200.00),
+(2, 'Hackathon', 1200.00),
+(3, 'FYE olympics', 7800.00),
+(4, 'FYE FEUD', 5000.00);
+
+
+INSERT INTO Date_of_event (UsersID, EventID, DateOfEvent, TimeOfEvent)
+VALUES 
+(123367, 1, '2024-10-21', '10:00:00'), 
+(108349, 2, '2024-12-17', '09:00:00'); 
+
